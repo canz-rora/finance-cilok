@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keuangan Jualan Cilok</title>
+<style>
+:root{font-family:Arial,sans-serif;color:#202124;background:#f4f5f7}
+*{box-sizing:border-box}
+body{margin:0;padding:18px}
+.wrap{max-width:680px;margin:auto}
+header{background:#f28b3c;color:white;padding:22px;border-radius:18px}
+header h1{margin:0 0 6px;font-size:25px}
+header p{margin:0;opacity:.95}
+.card{background:white;padding:18px;border-radius:15px;margin-top:15px;box-shadow:0 3px 14px #0000000c}
+h2{font-size:18px;margin:0 0 14px}
+label{display:block;font-size:13px;margin:10px 0 5px;color:#555}
+input{width:100%;padding:12px;border:1px solid #d9dce1;border-radius:9px;font-size:16px;background:white}
+button{border:0;border-radius:9px;padding:12px 14px;font-size:15px;cursor:pointer}
+.primary{background:#f28b3c;color:white;width:100%;margin-top:12px}
+.secondary{background:#edf0f4;color:#222}
+.danger{background:#ffe7e7;color:#b42318}
+.row{display:flex;gap:9px;align-items:center}
+.row>*{flex:1}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:#fff7ef;border-radius:12px;padding:13px}
+.stat small{color:#666}
+.stat strong{display:block;font-size:22px;margin-top:7px;color:#16834a;overflow-wrap:anywhere}
+#status{font-size:13px;color:#666;margin-top:10px}
+#login{max-width:480px;margin:25px auto}
+#app{display:none}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:10px 5px;border-bottom:1px solid #eee;vertical-align:top}
+th{color:#666}
+.actions{white-space:nowrap}
+.actions button{padding:7px 9px;margin:2px}
+.empty{text-align:center;color:#888;padding:20px}
+.topline{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.badge{font-size:12px;background:#e9f7ee;color:#167342;padding:6px 9px;border-radius:20px}
+.muted{color:#777;font-size:13px;line-height:1.5}
+#message{margin-top:10px;font-size:13px;color:#b42318}
+@media(max-width:430px){body{padding:12px}.stat strong{font-size:19px}th,td{font-size:12px}.actions button{font-size:12px;padding:6px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>🌶️ Keuangan Jualan Cilok</h1>
+  <p>Catatan pemasukan yang tersinkronisasi antarperangkat</p>
+</header>
+
+<section id="login" class="card">
+  <h2>Masuk ke aplikasi</h2>
+  <p class="muted">Admin masuk dengan email dan password. Viewer cukup menekan tombol Viewer, tanpa perlu memberikan email.</p>
+  <div id="adminFields">
+    <label>Email Admin</label>
+    <input id="email" type="email" placeholder="email admin">
+    <label>Password Admin</label>
+    <input id="password" type="password" placeholder="password">
+    <button class="primary" id="adminLogin">Login sebagai Admin</button>
+  </div>
+  <button class="secondary" id="viewerLogin" style="width:100%;margin-top:10px">👀 Masuk sebagai Viewer</button>
+  <div id="message"></div>
+</section>
+
+<main id="app">
+  <div class="card">
+    <div class="topline">
+      <h2>Ringkasan Keuangan</h2>
+      <span id="role" class="badge">Viewer</span>
+    </div>
+    <div class="stats">
+      <div class="stat"><small>Profit tanggal dipilih</small><strong id="dailyTotal">Rp0</strong></div>
+      <div class="stat"><small>Total seluruh hari</small><strong id="grandTotal">Rp0</strong></div>
+    </div>
+    <p class="muted" id="transactionCount">0 transaksi</p>
+    <div id="status">Menghubungkan database...</div>
+  </div>
+
+  <div class="card">
+    <h2>📅 Pilih tanggal riwayat</h2>
+    <div class="row">
+      <button class="secondary" id="prevDay">‹ Kemarin</button>
+      <input type="date" id="selectedDate">
+      <button class="secondary" id="nextDay">Besok ›</button>
+    </div>
+    <p class="muted">Pilih tanggal mana pun untuk melihat atau mencatat penjualan pada hari tersebut.</p>
+  </div>
+
+  <section class="card" id="entryCard" style="display:none">
+    <h2>➕ Tambah pemasukan</h2>
+    <label>Keterangan</label>
+    <input id="note" type="text" maxlength="80" placeholder="Contoh: Jualan pagi">
+    <label>Profit / pemasukan</label>
+    <input id="amount" type="text" inputmode="text" placeholder="Contoh: 5k, 10k, atau 15000">
+    <button class="primary" id="addEntry">Simpan pemasukan</button>
+    <p class="muted">Format yang diterima: 5000, 5k, 1jt. Masukkan angka pemasukan/profit yang ingin dicatat.</p>
+  </section>
+
+  <div class="card">
+    <h2 id="historyTitle">Riwayat</h2>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>Waktu</th><th>Keterangan</th><th>Profit</th><th id="actionHeading"></th></tr></thead>
+        <tbody id="history"></tbody>
+      </table>
+    </div>
+    <div id="empty" class="empty">Belum ada transaksi pada tanggal ini.</div>
+  </div>
+  <button class="secondary" id="logout" style="width:100%;margin:15px 0">Keluar</button>
+</main>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js";
+import { getDatabase, ref, onValue, push, set, update, remove } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBUBHiUuMO1rzWxrWEwMUqGAFj49YBiyiI",
+  authDomain: "riwayat-cilok.firebaseapp.com",
+  databaseURL: "https://riwayat-cilok-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "riwayat-cilok",
+  storageBucket: "riwayat-cilok.firebasestorage.app",
+  messagingSenderId: "850541125978",
+  appId: "1:850541125978:web:b7fb4819dd85371eaf1363",
+  measurementId: "G-XVDZLWLSRF"
+};
+
+const ADMIN_UID = "FZ0c2dbVs3f1pdRPm2ucvDKqEmp1";
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
+const transactionsRef = ref(db, "transactions");
+
+const $ = id => document.getElementById(id);
+let currentUser = null;
+let isAdmin = false;
+let transactions = {};
+let unsubscribeData = null;
+
+function localDateString(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth()+1).padStart(2,"0");
+  const d = String(date.getDate()).padStart(2,"0");
+  return `${y}-${m}-${d}`;
+}
+$("selectedDate").value = localDateString();
+
+function money(n) {
+  return "Rp" + Number(n || 0).toLocaleString("id-ID");
+}
+function parseAmount(raw) {
+  let s = String(raw).trim().toLowerCase().replace(/\s/g,"").replace(/^rp/,"");
+  let multiplier = 1;
+  if (s.endsWith("jt")) { multiplier = 1000000; s = s.slice(0,-2); }
+  else if (s.endsWith("k")) { multiplier = 1000; s = s.slice(0,-1); }
+  s = s.replace(/\./g,"").replace(/,/g,".");
+  const n = Number(s);
+  return Number.isFinite(n) ? Math.round(n * multiplier) : 0;
+}
+function showMessage(msg) { $("message").textContent = msg; }
+
+$("adminLogin").addEventListener("click", async () => {
+  showMessage("");
+  const email = $("email").value.trim();
+  const password = $("password").value;
+  if (!email || !password) return showMessage("Masukkan email dan password Admin.");
+  try { await signInWithEmailAndPassword(auth,email,password); }
+  catch(e) { showMessage("Login gagal: " + e.message); }
+});
+$("viewerLogin").addEventListener("click", async () => {
+  showMessage("");
+  try { await signInAnonymously(auth); }
+  catch(e) { showMessage("Viewer gagal masuk: " + e.message); }
+});
+$("logout").addEventListener("click", async () => {
+  if (unsubscribeData) { unsubscribeData(); unsubscribeData = null; }
+  await signOut(auth);
+});
+$("selectedDate").addEventListener("change", render);
+$("prevDay").addEventListener("click", () => shiftDate(-1));
+$("nextDay").addEventListener("click", () => shiftDate(1));
+function shiftDate(delta) {
+  const d = new Date($("selectedDate").value + "T12:00:00");
+  d.setDate(d.getDate()+delta);
+  $("selectedDate").value = localDateString(d);
+  render();
+}
+
+$("addEntry").addEventListener("click", async () => {
+  if (!isAdmin) return;
+  const amount = parseAmount($("amount").value);
+  const note = $("note").value.trim() || "Penjualan cilok";
+  const date = $("selectedDate").value;
+  if (!date || amount <= 0) return alert("Masukkan tanggal dan nominal yang benar.");
+  try {
+    const newRef = push(transactionsRef);
+    await set(newRef, { date, note, amount, createdAt: Date.now() });
+    $("amount").value = "";
+    $("note").value = "";
+  } catch(e) { alert("Gagal menyimpan: " + e.message); }
+});
+
+function render() {
+  const date = $("selectedDate").value;
+  const items = Object.entries(transactions).map(([id,v]) => ({id,...v}));
+  const dayItems = items.filter(x => x.date === date).sort((a,b) => (a.createdAt||0)-(b.createdAt||0));
+  const daily = dayItems.reduce((sum,x) => sum + Number(x.amount||0),0);
+  const total = items.reduce((sum,x) => sum + Number(x.amount||0),0);
+  $("dailyTotal").textContent = money(daily);
+  $("grandTotal").textContent = money(total);
+  $("transactionCount").textContent = `${dayItems.length} transaksi pada tanggal ini · ${items.length} transaksi keseluruhan`;
+  $("historyTitle").textContent = "Riwayat " + date;
+  $("history").replaceChildren();
+  $("empty").style.display = dayItems.length ? "none" : "block";
+  $("actionHeading").textContent = isAdmin ? "Aksi" : "";
+  for (const item of dayItems) {
+    const tr = document.createElement("tr");
+    const time = document.createElement("td");
+    time.textContent = item.createdAt ? new Date(item.createdAt).toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"}) : "-";
+    const note = document.createElement("td"); note.textContent = item.note || "Penjualan cilok";
+    const amount = document.createElement("td"); amount.textContent = money(item.amount);
+    tr.append(time,note,amount);
+    if (isAdmin) {
+      const actions = document.createElement("td"); actions.className = "actions";
+      const edit = document.createElement("button"); edit.className = "secondary"; edit.textContent = "Edit";
+      edit.addEventListener("click", () => editItem(item));
+      const del = document.createElement("button"); del.className = "danger"; del.textContent = "Hapus";
+      del.addEventListener("click", () => deleteItem(item.id));
+      actions.append(edit,del); tr.append(actions);
+    }
+    $("history").append(tr);
+  }
+}
+async function editItem(item) {
+  const newNote = prompt("Ubah keterangan:", item.note || "Penjualan cilok");
+  if (newNote === null) return;
+  const newAmountText = prompt("Ubah profit (contoh 5k atau 5000):", String(item.amount));
+  if (newAmountText === null) return;
+  const newAmount = parseAmount(newAmountText);
+  if (newAmount <= 0) return alert("Nominal tidak valid.");
+  try { await update(ref(db, "transactions/" + item.id), { note:newNote.trim() || "Penjualan cilok", amount:newAmount }); }
+  catch(e) { alert("Gagal mengedit: " + e.message); }
+}
+async function deleteItem(id) {
+  if (!confirm("Hapus transaksi ini?")) return;
+  try { await remove(ref(db, "transactions/" + id)); }
+  catch(e) { alert("Gagal menghapus: " + e.message); }
+}
+
+onAuthStateChanged(auth, user => {
+  currentUser = user;
+  if (unsubscribeData) { unsubscribeData(); unsubscribeData = null; }
+  if (!user) {
+    isAdmin = false;
+    $("login").style.display = "block";
+    $("app").style.display = "none";
+    return;
+  }
+  isAdmin = user.uid === ADMIN_UID;
+  $("login").style.display = "none";
+  $("app").style.display = "block";
+  $("role").textContent = isAdmin ? "👑 Admin" : "👀 Viewer";
+  $("entryCard").style.display = isAdmin ? "block" : "none";
+  $("status").textContent = "Menghubungkan ke database...";
+  unsubscribeData = onValue(transactionsRef, snapshot => {
+    transactions = snapshot.val() || {};
+    $("status").textContent = "● Online · Data tersinkronisasi";
+    render();
+  }, error => {
+    $("status").textContent = "Gagal membaca database: " + error.message;
+  });
+});
+</script>
+</body>
+</html>
